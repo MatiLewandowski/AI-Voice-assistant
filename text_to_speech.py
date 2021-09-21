@@ -17,6 +17,7 @@ import pytz
 
 
 
+
 #engine init
 engine=pyttsx3.init()
 engine.setProperty('rate',150)
@@ -99,7 +100,7 @@ def speech_recognition(counter=1):
         print('listening...')
         r.adjust_for_ambient_noise(source)
         audio=r.listen(source)
-        try:   
+        try:  
             recognized=r.recognize_google(audio)
             print(recognized)
         except Exception:
@@ -114,25 +115,25 @@ def searching(query):
         answer=next(res.results).text
         print(answer)
     except:
-        found=searching(query)
+        found=wikipedia.search(query,3)
         print(wikipedia.search(query,3))
         speak('3 most popular results are: ')
         for item in found:
             speak(item)
         speak('What would you like me to read?')
-        choice=speech_recognition().lower()
+        choice=''
+        possibilities=['first','second','third']
+        while choice not in possibilities:
+            choice=speech_recognition().lower()
         if 'first' in choice:
             print(wikipedia.summary(found[0]))
-            speak(wikipedia.summary(found[0]),2)
+            speak(wikipedia.summary(found[0],2))
         elif 'second' in choice:
             print(wikipedia.summary(found[1]))
-            speak(wikipedia.summary(found[1]),2)  
+            speak(wikipedia.summary(found[1],2))  
         elif 'third' in choice:
             print(wikipedia.summary(found[2]))
-            speak(wikipedia.summary(found[2]),2)
-    finally:
-        speak("Here are some duckduckgo search results")
-        webbrowser.open('https://duckduckgo.com/html/?q='+query)
+            speak(wikipedia.summary(found[2],2))    
 
 def yt_search():
     speak('would you like to see some specific video?')
@@ -149,34 +150,53 @@ def yt_search():
 
 def main():
     wake='hello'
+    decision='yes'
+    choice_flag=True
     while True:
 
         text=speech_recognition().lower()
 
         while text.count(wake)>0:
-            speak("What's up?")
-
-            query=speech_recognition().lower()
+            if choice_flag==True:
+                speak("What's up?")
+            query=''
+            while query=='' and decision=='yes':
+                query=speech_recognition().lower()
 
             if 'schedule' in query:
                 service=log_to_Gcalendar()
                 get_events(service,query)
+                text=''
 
             elif 'open google' in query:
                 webbrowser.open('google.pl')
+                text=''
 
             elif 'open youtube' in query:
                 yt_search()
+                text=''
 
 
             elif 'time' in query:
                 speak(current_time())
+                text=''
                 
             elif 'search' in query:
                 query=query.replace('search for','')
                 print(query)
                 searching(query)
-            text=''
+                text=''
+            else:
+                speak("Sorry, I don't understand. Would you like to try again?")
+                choices=['yes','no']
+                while choice_flag==True:
+                    decision=speech_recognition().lower()
+                    if decision in choices:
+                        choice_flag=False
+                    else:
+                        speak('Come again?')
+                
+
 main()
 
 
