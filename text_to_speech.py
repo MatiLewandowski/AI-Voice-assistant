@@ -1,3 +1,5 @@
+from __future__ import print_function
+from re import search
 from typing import _SpecialForm
 import pyttsx3
 import datetime
@@ -6,10 +8,66 @@ import webbrowser
 import wolframalpha
 import wikipedia
 from youtube_search import YoutubeSearch
+import os.path
+from googleapiclient.discovery import build
+from google_auth_oauthlib.flow import InstalledAppFlow
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
+import pytz
+
+
 
 #engine init
 engine=pyttsx3.init()
 engine.setProperty('rate',150)
+
+def log_to_Gcalendar():
+    SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
+    creds = None
+    if os.path.exists('token.json'):
+        creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+    # If there are no (valid) credentials available, let the user log in.
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            flow = InstalledAppFlow.from_client_secrets_file(
+                'credentials.json', SCOPES)
+            creds = flow.run_local_server(port=0)
+        # Save the credentials for the next run
+        with open('token.json', 'w') as token:
+            token.write(creds.to_json())
+
+    service = build('calendar', 'v3', credentials=creds)
+    return service
+
+def get_events(service,query):
+        # Call the Calendar API
+    tz=pytz.timezone('Europe/Warsaw')
+    now = datetime.datetime.now()
+    end_of_day=datetime.datetime.combine(now,datetime.datetime.max.time())
+    now=now.astimezone(tz)
+    end_of_day=end_of_day.astimezone(tz)
+
+    print(f'Getting the upcoming events')
+
+    if 'today' in query:
+        events_result = service.events().list(calendarId='primary', timeMin=now.isoformat(),timeMax=end_of_day.isoformat(),
+                                        maxResults=5, singleEvents=True,
+                                        orderBy='startTime').execute()
+
+    else:
+        events_result = service.events().list(calendarId='primary', timeMin=now.isoformat(),
+                                        maxResults=10, singleEvents=True,
+                                        orderBy='startTime').execute()  
+    events = events_result.get('items', [])
+
+    if not events:
+        print('No upcoming events found.')
+        speak('No upcoming events')
+    for event in events:
+        start = event['start'].get('dateTime', event['start'].get('date'))
+        print(start, event['summary'])
 
 def speak(audio):
     engine.say(audio)
@@ -31,6 +89,8 @@ def welcome_message():
 welcome_message()
 
 
+
+
 def speech_recognition(counter=1):
     r=sr.Recognizer()
     mic=sr.Microphone()
@@ -42,8 +102,8 @@ def speech_recognition(counter=1):
         try:   
             recognized=r.recognize_google(audio)
             print(recognized)
-        except Exception as e:
-            print('Exception: ' + str(e))
+        except Exception:
+            pass
         return recognized
 
 def searching(query):
@@ -54,56 +114,71 @@ def searching(query):
         answer=next(res.results).text
         print(answer)
     except:
+        found=searching(query)
         print(wikipedia.search(query,3))
-        return wikipedia.search(query,3)
+        speak('3 most popular results are: ')
+        for item in found:
+            speak(item)
+        speak('What would you like me to read?')
+        choice=speech_recognition().lower()
+        if 'first' in choice:
+            print(wikipedia.summary(found[0]))
+            speak(wikipedia.summary(found[0]),2)
+        elif 'second' in choice:
+            print(wikipedia.summary(found[1]))
+            speak(wikipedia.summary(found[1]),2)  
+        elif 'third' in choice:
+            print(wikipedia.summary(found[2]))
+            speak(wikipedia.summary(found[2]),2)
+    finally:
+        speak("Here are some duckduckgo search results")
+        webbrowser.open('https://duckduckgo.com/html/?q='+query)
 
-wake='hello'
-while True:
-
+def yt_search():
+    speak('would you like to see some specific video?')
     text=speech_recognition().lower()
+    if 'no' in text:
+        webbrowser.open('youtube.pl')
 
-    if text.count(wake)>0:
+    elif 'yes' in text:
+        speak('tell me what you want to see')
+        text=speech_recognition().lower()
+        result=YoutubeSearch(text,1).to_dict()
+        url_suffix=result[0]['url_suffix']
+        webbrowser.open('youtube.pl'+url_suffix)
 
-        speak("lana is here")
-        query=speech_recognition().lower()
-        if 'open google' in query:
-            webbrowser.open('google.pl')
-        elif 'open youtube' in query:
-            webbrowser.open('youtube.pl')
-            speak('would you like to see some specific video?')
-            text=speech_recognition().lower()
-            if 'no' in text:
-                webbrowser.open('youtube.pl')
+def main():
+    wake='hello'
+    while True:
 
-            elif 'yes' in text:
-                speak('tell me what you want to see')
-                text=speech_recognition().lower()
-                result=YoutubeSearch(text,1).to_dict()
-                url_suffix=result[0]['url_suffix']
-                webbrowser.open('youtube.pl'+url_suffix)
+        text=speech_recognition().lower()
+
+        while text.count(wake)>0:
+            speak("What's up?")
+
+            query=speech_recognition().lower()
+
+            if 'schedule' in query:
+                service=log_to_Gcalendar()
+                get_events(service,query)
+
+            elif 'open google' in query:
+                webbrowser.open('google.pl')
+
+            elif 'open youtube' in query:
+                yt_search()
 
 
-        elif 'time' in query:
-            speak(current_time())
-        elif 'search' in query:
-            query=query.replace('search for','')
-            query.strip()
-            print(query)
-            found=searching(query)
-            speak('3 most popular results are: ')
-            for item in found:
-                speak(item)
-            speak('What would you like me to read?')
-            choice=speech_recognition().lower()
-            if 'first' in choice:
-                print(wikipedia.summary(found[0]))
-                speak(wikipedia.summary(found[0]),2)
-            elif 'second' in choice:
-                print(wikipedia.summary(found[1]))
-                speak(wikipedia.summary(found[1]),2)  
-            elif 'third' in choice:
-                print(wikipedia.summary(found[2]))
-                speak(wikipedia.summary(found[2]),2)
+            elif 'time' in query:
+                speak(current_time())
+                
+            elif 'search' in query:
+                query=query.replace('search for','')
+                print(query)
+                searching(query)
+            text=''
+main()
+
 
 
 
