@@ -15,6 +15,18 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 import pytz
 import requests,json
+import creds
+
+
+"""
+Voice Assistant
+This software is a small voice assistant which can help with day to day activities.
+It also shows that the creator can use variety of libraries including external APIs such as wolfram or openweathermap.
+
+Credentials for all external APIs are stored in separate file called 'creds.py' which include sensitive data.
+It's not shared within GitHub.
+
+"""
 
 
 
@@ -83,16 +95,15 @@ def weather_info(query):
     #get the city name
     city=query.split()[-1]
     #credentials for openweathermap API
-    api_key='5601d4d8cb528b7c108b79aaee8b4806'
     
     #URL prepared for weather info search
-    cpl_url=f'http://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric'
+    cpl_url=f'http://api.openweathermap.org/data/2.5/weather?q={city}&appid={creds.weather_api_key}&units=metric'
     try:
         response=requests.get(cpl_url)
 
     except:
         #if there's an error, request weather info of hometown
-        cpl_url=f'http://api.openweathermap.org/data/2.5/weather?q=Gdansk&appid={api_key}&units=metric'
+        cpl_url=f'http://api.openweathermap.org/data/2.5/weather?q=Gdansk&appid={creds.weather_api_key}&units=metric'
         response=requests.get(cpl_url)
     finally:
         info=response.json()
@@ -147,8 +158,7 @@ def searching(query):
     #Search function for user queries
     #first try wolfram engine
     try:
-        app_id='YGHQAL-XY75Y64RRL'
-        client=wolframalpha.Client(app_id)
+        client=wolframalpha.Client(creds.wolfram_api_key)
         res=client.query(query)
         answer=next(res.results).text
         print(answer)
@@ -226,7 +236,6 @@ def main():
             elif 'open youtube' in query:
                 yt_search()
                 text=''
-
 
             elif 'time' in query:
                 speak(current_time())
